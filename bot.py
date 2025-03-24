@@ -421,31 +421,6 @@ async def restart_server(interaction: discord.Interaction, container_name: str):
         await interaction.response.send_message(embed=discord.Embed(description="### No instance found for your user.", color=0xff0000))
         return
 
-    try:
-        subprocess.run(["docker", "restart", container_id], check=True)
-        exec_cmd = await asyncio.create_subprocess_exec("docker", "exec", container_id, "tmate", "-F",
-                                                        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
-        ssh_session_line = await capture_ssh_session_line(exec_cmd)
-        if ssh_session_line:
-            await interaction.user.send(embed=discord.Embed(description=f"### Instance Restarted\nSSH Session Command: ```{ssh_session_line}```\nOS: Ubuntu 22.04", color=0x00ff00))
-            await interaction.response.send_message(embed=discord.Embed(description="### Instance restarted successfully. Check your DMs for details.", color=0x00ff00))
-        else:
-            await interaction.response.send_message(embed=discord.Embed(description="### Instance restarted, but failed to get SSH session line.", color=0xff0000))
-    except subprocess.CalledProcessError as e:
-        await interaction.response.send_message(embed=discord.Embed(description=f"Error restarting instance: {e}", color=0xff0000))
-
-def get_container_id_from_database(userid, container_name):
-    if not os.path.exists(database_file):
-        return None
-    with open(database_file, 'r') as f:
-        for line in f:
-            if line.startswith(userid) and container_name in line:
-                return line.split('|')[1]
-    return None
-
-def generate_random_port():
-    return random.randint(1025, 65535)
-
 async def create_server_task(interaction, ram, cpu, os, password):
     await interaction.response.send_message(embed=discord.Embed(
         description=f"🚀 Creating VPS...\n**OS:** {os}\n**RAM:** {ram}\n**CPU:** {cpu} Cores\n**Password:** {password}",
@@ -481,10 +456,6 @@ async def create_server_task(interaction, ram, cpu, os, password):
             f"echo 'root:{password}' | chpasswd"
         ])
 
-        # Set expiration date (7 days from now)
-        expiry_date = datetime.datetime.now() + datetime.timedelta(days=7)
-        vps_expirations[container_id] = expiry_date
-
     except subprocess.CalledProcessError as e:
         await interaction.followup.send(embed=discord.Embed(
             description=f"❌ Error creating VPS: {e}",
@@ -501,7 +472,7 @@ async def create_server_task(interaction, ram, cpu, os, password):
     ssh_session_line = await capture_ssh_session_line(exec_cmd)
     if ssh_session_line:
         await interaction.user.send(embed=discord.Embed(
-            description=f"✅ VPS Created\n**SSH:** ```{ssh_session_line}```\n**OS:** {os}\n**Password:** `{password}`\n**Expires:** {expiry_date.strftime('%Y-%m-%d')}",
+            description=f"✅ VPS Created\n**SSH:** ```{ssh_session_line}```\n**OS:** {os}\n**Password:** `{password}`",
             color=0x00ff00
         ))
         add_to_database(userid, container_id, ssh_session_line)
@@ -515,7 +486,32 @@ async def create_server_task(interaction, ram, cpu, os, password):
             color=0xff0000
         ))
         subprocess.run(["docker", "kill", container_id])
-        subprocess.run(["docker", "rm", container_id])
+        subprocess.run(["docker", "rm", container_id])    try:
+        subprocess.run(["docker", "restart", container_id], check=True)
+        exec_cmd = await asyncio.create_subprocess_exec("docker", "exec", container_id, "tmate", "-F",
+                                                        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+        ssh_session_line = await capture_ssh_session_line(exec_cmd)
+        if ssh_session_line:
+            await interaction.user.send(embed=discord.Embed(description=f"### Instance Restarted\nSSH Session Command: ```{ssh_session_line}```\nOS: Ubuntu 22.04", color=0x00ff00))
+            await interaction.response.send_message(embed=discord.Embed(description="### Instance restarted successfully. Check your DMs for details.", color=0x00ff00))
+        else:
+            await interaction.response.send_message(embed=discord.Embed(description="### Instance restarted, but failed to get SSH session line.", color=0xff0000))
+    except subprocess.CalledProcessError as e:
+        await interaction.response.send_message(embed=discord.Embed(description=f"Error restarting instance: {e}", color=0xff0000))
+
+def get_container_id_from_database(userid, container_name):
+    if not os.path.exists(database_file):
+        return None
+    with open(database_file, 'r') as f:
+        for line in f:
+            if line.startswith(userid) and container_name in line:
+                return line.split('|')[1]
+    return None
+
+def generate_random_port():
+    return random.randint(1025, 65535)
+
+
         return
 
     ssh_session_line = await capture_ssh_session_line(exec_cmd)
